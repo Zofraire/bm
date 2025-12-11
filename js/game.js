@@ -13,28 +13,28 @@
     const CONFIG = {
         // Bird settings
         bird: {
-            startX: -15,
-            startY: 5,
-            startZ: -30,
+            startX: 0,
+            startY: 8,
+            startZ: -20,
             size: 1.2,
-            gravity: -0.015,
-            flapStrength: 0.35,
+            gravity: -0.018,
+            flapStrength: 0.4,
             maxVelocity: 0.5,
             minVelocity: -0.6,
             rotationSpeed: 0.1
         },
         // Pipe settings
         pipes: {
-            speed: 0.25,
-            spawnInterval: 2000,
-            gapSize: 8,
-            width: 3,
+            speed: 0.3,
+            spawnInterval: 2500,
+            gapSize: 9,
+            width: 4,
             height: 25,
-            depth: 3,
-            startZ: -30,
-            endZ: 30,
-            minY: 2,
-            maxY: 12
+            depth: 4,
+            startZ: -120,
+            endZ: 10,
+            minY: 4,
+            maxY: 14
         },
         // Game boundaries
         bounds: {
@@ -48,8 +48,8 @@
             fov: 60,
             near: 0.1,
             far: 10000,
-            positionY: 8,
-            positionZ: 4
+            positionY: 10,
+            positionZ: 15
         }
     };
 
@@ -214,7 +214,8 @@
     // BIRD
     // ============================================
     function createBird() {
-        const birdGroup = new THREE.Group();
+        // Inner group for the bird model (built facing +X)
+        const birdModel = new THREE.Group();
 
         // Body - main ellipsoid
         const bodyGeometry = new THREE.SphereGeometry(CONFIG.bird.size, 16, 16);
@@ -224,7 +225,7 @@
             shininess: 30
         });
         const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        birdGroup.add(body);
+        birdModel.add(body);
 
         // Belly - white part
         const bellyGeometry = new THREE.SphereGeometry(CONFIG.bird.size * 0.7, 16, 16);
@@ -235,31 +236,31 @@
         });
         const belly = new THREE.Mesh(bellyGeometry, bellyMaterial);
         belly.position.set(0.2, -0.1, 0.3);
-        birdGroup.add(belly);
+        birdModel.add(belly);
 
         // Eye white (left)
         const eyeWhiteGeometry = new THREE.SphereGeometry(CONFIG.bird.size * 0.35, 12, 12);
         const eyeWhiteMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff });
         const eyeWhiteLeft = new THREE.Mesh(eyeWhiteGeometry, eyeWhiteMaterial);
         eyeWhiteLeft.position.set(0.6, 0.3, 0.5);
-        birdGroup.add(eyeWhiteLeft);
+        birdModel.add(eyeWhiteLeft);
 
         // Eye white (right)
         const eyeWhiteRight = new THREE.Mesh(eyeWhiteGeometry, eyeWhiteMaterial);
         eyeWhiteRight.position.set(0.6, 0.3, -0.5);
-        birdGroup.add(eyeWhiteRight);
+        birdModel.add(eyeWhiteRight);
 
         // Pupil (left)
         const pupilGeometry = new THREE.SphereGeometry(CONFIG.bird.size * 0.15, 8, 8);
         const pupilMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 });
         const pupilLeft = new THREE.Mesh(pupilGeometry, pupilMaterial);
         pupilLeft.position.set(0.85, 0.35, 0.5);
-        birdGroup.add(pupilLeft);
+        birdModel.add(pupilLeft);
 
         // Pupil (right)
         const pupilRight = new THREE.Mesh(pupilGeometry, pupilMaterial);
         pupilRight.position.set(0.85, 0.35, -0.5);
-        birdGroup.add(pupilRight);
+        birdModel.add(pupilRight);
 
         // Beak
         const beakGeometry = new THREE.ConeGeometry(0.3, 0.8, 8);
@@ -267,7 +268,7 @@
         const beak = new THREE.Mesh(beakGeometry, beakMaterial);
         beak.rotation.z = -Math.PI / 2;
         beak.position.set(1.4, 0, 0);
-        birdGroup.add(beak);
+        birdModel.add(beak);
 
         // Wing (left)
         const wingGeometry = new THREE.SphereGeometry(CONFIG.bird.size * 0.5, 8, 8);
@@ -276,13 +277,13 @@
         const wingLeft = new THREE.Mesh(wingGeometry, wingMaterial);
         wingLeft.position.set(-0.2, 0, 0.9);
         wingLeft.name = 'wingLeft';
-        birdGroup.add(wingLeft);
+        birdModel.add(wingLeft);
 
         // Wing (right)
-        const wingRight = new THREE.Mesh(wingGeometry, wingMaterial);
+        const wingRight = new THREE.Mesh(wingGeometry.clone(), wingMaterial);
         wingRight.position.set(-0.2, 0, -0.9);
         wingRight.name = 'wingRight';
-        birdGroup.add(wingRight);
+        birdModel.add(wingRight);
 
         // Tail
         const tailGeometry = new THREE.BoxGeometry(0.6, 0.1, 0.8);
@@ -290,9 +291,15 @@
         const tail = new THREE.Mesh(tailGeometry, tailMaterial);
         tail.position.set(-1.2, 0.1, 0);
         tail.rotation.z = 0.2;
-        birdGroup.add(tail);
+        birdModel.add(tail);
 
-        bird = birdGroup;
+        // Rotate the model to face forward (-Z direction, away from camera)
+        birdModel.rotation.y = -Math.PI / 2;
+        birdModel.name = 'birdModel';
+
+        // Outer group for position and tilt
+        bird = new THREE.Group();
+        bird.add(birdModel);
         bird.position.set(CONFIG.bird.startX, CONFIG.bird.startY, CONFIG.bird.startZ);
         scene.add(bird);
     }
@@ -300,12 +307,15 @@
     function animateBirdWings(time) {
         if (!bird) return;
 
-        const wingLeft = bird.getObjectByName('wingLeft');
-        const wingRight = bird.getObjectByName('wingRight');
+        const birdModel = bird.getObjectByName('birdModel');
+        if (!birdModel) return;
+
+        const wingLeft = birdModel.getObjectByName('wingLeft');
+        const wingRight = birdModel.getObjectByName('wingRight');
 
         if (wingLeft && wingRight) {
             const flapSpeed = gameState.status === 'playing' ? 15 : 5;
-            const flapAmount = Math.sin(time * flapSpeed) * 0.3;
+            const flapAmount = Math.sin(time * flapSpeed) * 0.4;
             wingLeft.rotation.x = flapAmount;
             wingRight.rotation.x = -flapAmount;
         }
@@ -379,6 +389,7 @@
         pipeGroup.userData.gapTop = gapCenterY + CONFIG.pipes.gapSize / 2;
         pipeGroup.userData.gapBottom = gapCenterY - CONFIG.pipes.gapSize / 2;
 
+        // Position pipe at bird's X, spawn far ahead in -Z
         pipeGroup.position.set(CONFIG.bird.startX, 0, CONFIG.pipes.startZ);
         scene.add(pipeGroup);
         pipes.push(pipeGroup);
@@ -398,8 +409,9 @@
             const pipe = pipes[i];
             pipe.position.z += moveAmount;
 
-            // Check if bird passed this pipe (for scoring)
-            if (!pipe.userData.passed && pipe.position.z > bird.position.z) {
+            // Check if pipe passed the bird (for scoring)
+            // Score when pipe passes the bird's Z position going towards camera
+            if (!pipe.userData.passed && pipe.position.z > bird.position.z + 2) {
                 pipe.userData.passed = true;
                 incrementScore();
             }
@@ -458,11 +470,15 @@
         gameState.status = 'playing';
         gameState.score = 0;
         birdVelocity = 0;
-        lastPipeSpawn = performance.now();
+        gameTime = 0;
+        lastPipeSpawn = 0;
 
-        // Reset bird position
+        // Reset bird position and rotation
         bird.position.set(CONFIG.bird.startX, CONFIG.bird.startY, CONFIG.bird.startZ);
-        bird.rotation.z = 0;
+        const birdModel = bird.getObjectByName('birdModel');
+        if (birdModel) {
+            birdModel.rotation.x = 0;
+        }
 
         // Clear existing pipes
         pipes.forEach(pipe => scene.remove(pipe));
@@ -473,8 +489,7 @@
         startScreen.classList.add('hidden');
         gameOverScreen.classList.add('hidden');
 
-        // Spawn first pipe
-        setTimeout(spawnPipe, 500);
+        // First pipe spawns after a short delay (handled by gameTime check)
     }
 
     function gameOver() {
@@ -559,6 +574,8 @@
     // ============================================
     // RENDER LOOP
     // ============================================
+    let gameTime = 0;
+
     function render() {
         requestAnimationFrame(render);
 
@@ -572,19 +589,24 @@
 
         // Game logic
         if (gameState.status === 'playing') {
+            gameTime += delta;
+
             // Apply gravity to bird
             birdVelocity += CONFIG.bird.gravity;
             birdVelocity = Math.max(CONFIG.bird.minVelocity, Math.min(CONFIG.bird.maxVelocity, birdVelocity));
             bird.position.y += birdVelocity;
 
-            // Rotate bird based on velocity
-            const targetRotation = birdVelocity * 2;
-            bird.rotation.z = THREE.MathUtils.lerp(bird.rotation.z, targetRotation, 0.1);
+            // Tilt bird based on velocity (X rotation for pitch since bird faces -Z)
+            const birdModel = bird.getObjectByName('birdModel');
+            if (birdModel) {
+                const targetTilt = -birdVelocity * 2.5; // negative because of orientation
+                birdModel.rotation.x = THREE.MathUtils.lerp(birdModel.rotation.x, targetTilt, 0.1);
+            }
 
-            // Spawn pipes
-            if (time * 1000 - lastPipeSpawn > CONFIG.pipes.spawnInterval) {
+            // Spawn pipes at regular intervals
+            if (gameTime > lastPipeSpawn + CONFIG.pipes.spawnInterval / 1000) {
                 spawnPipe();
-                lastPipeSpawn = time * 1000;
+                lastPipeSpawn = gameTime;
             }
 
             // Update pipes
@@ -597,7 +619,10 @@
         } else if (gameState.status === 'start') {
             // Idle animation - bird bobs up and down
             bird.position.y = CONFIG.bird.startY + Math.sin(time * 2) * 0.5;
-            bird.rotation.z = Math.sin(time * 3) * 0.1;
+            const birdModel = bird.getObjectByName('birdModel');
+            if (birdModel) {
+                birdModel.rotation.x = Math.sin(time * 3) * 0.1;
+            }
         }
 
         // Animate bird wings
