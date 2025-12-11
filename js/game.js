@@ -68,14 +68,16 @@
     let container, width, height;
     let scene, renderer, camera;
     let terrain, bird, pipes = [];
-    let clock = new THREE.Clock();
+    let clock;
 
     // Bird physics
     let birdVelocity = 0;
-    let birdRotation = 0;
 
     // Pipe spawning
     let lastPipeSpawn = 0;
+
+    // Time tracking
+    let lastTime = 0;
 
     // Input state
     let flapPressed = false;
@@ -103,6 +105,9 @@
 
         // Update high score display
         highScoreEl.textContent = gameState.highScore;
+
+        // Initialize time tracking
+        lastTime = performance.now();
 
         // Start render loop
         render();
@@ -471,13 +476,14 @@
         gameState.score = 0;
         birdVelocity = 0;
         gameTime = 0;
-        lastPipeSpawn = 0;
+        lastPipeSpawn = -1; // Start negative so first pipe spawns after delay
+        lastTime = performance.now();
 
         // Reset bird position and rotation
         bird.position.set(CONFIG.bird.startX, CONFIG.bird.startY, CONFIG.bird.startZ);
         const birdModel = bird.getObjectByName('birdModel');
         if (birdModel) {
-            birdModel.rotation.x = 0;
+            birdModel.rotation.set(0, -Math.PI / 2, 0); // Reset all rotations, keep facing forward
         }
 
         // Clear existing pipes
@@ -488,8 +494,6 @@
         scoreDisplay.textContent = '0';
         startScreen.classList.add('hidden');
         gameOverScreen.classList.add('hidden');
-
-        // First pipe spawns after a short delay (handled by gameTime check)
     }
 
     function gameOver() {
@@ -579,8 +583,13 @@
     function render() {
         requestAnimationFrame(render);
 
-        const time = performance.now() * 0.001;
-        const delta = clock.getDelta();
+        const now = performance.now();
+        const time = now * 0.001;
+
+        // Calculate delta with a cap to prevent huge jumps
+        let delta = (now - lastTime) / 1000;
+        delta = Math.min(delta, 0.1); // Cap at 100ms to prevent physics explosion
+        lastTime = now;
 
         // Update landscape
         if (terrain && terrain.material.uniforms) {
@@ -599,8 +608,11 @@
             // Tilt bird based on velocity (X rotation for pitch since bird faces -Z)
             const birdModel = bird.getObjectByName('birdModel');
             if (birdModel) {
-                const targetTilt = -birdVelocity * 2.5; // negative because of orientation
-                birdModel.rotation.x = THREE.MathUtils.lerp(birdModel.rotation.x, targetTilt, 0.1);
+                const targetTilt = -birdVelocity * 2.5;
+                const currentX = birdModel.rotation.x;
+                birdModel.rotation.x = currentX + (targetTilt - currentX) * 0.1;
+                // Keep facing forward
+                birdModel.rotation.y = -Math.PI / 2;
             }
 
             // Spawn pipes at regular intervals
@@ -622,6 +634,7 @@
             const birdModel = bird.getObjectByName('birdModel');
             if (birdModel) {
                 birdModel.rotation.x = Math.sin(time * 3) * 0.1;
+                birdModel.rotation.y = -Math.PI / 2;
             }
         }
 
